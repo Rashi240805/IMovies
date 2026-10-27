@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IMovies - Online Cinema Booking Platform</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <!-- React 18, ReactDOM, Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    .card {
+      background-color: #1e293b;
+      border-color: #334155;
+      color: #f8fafc;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+    .movie-poster-card {
+      height: 360px;
+      object-fit: cover;
+      border-top-left-radius: calc(0.375rem - 1px);
+      border-top-right-radius: calc(0.375rem - 1px);
+    }
+    .screen-container { perspective: 400px; }
+    .cinema-screen {
+      height: 24px;
+      background: linear-gradient(to bottom, #38bdf8, #0284c7);
+      box-shadow: 0 15px 35px rgba(56, 189, 248, 0.45);
+      transform: rotateX(-30deg) scale(0.9);
+      border-radius: 6px;
+    }
+    .seat {
+      width: 38px;
+      height: 36px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease-in-out;
+      border: 1px solid #475569;
+    }
+    .seat-available {
+      background-color: #334155;
+      color: #cbd5e1;
+    }
+    .seat-available:hover {
+      background-color: #475569;
+      transform: scale(1.1);
+    }
+    .seat-selected {
+      background-color: #22c55e !important;
+      color: #ffffff !important;
+      border-color: #16a34a !important;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+      transform: scale(1.08);
+    }
+    .seat-booked {
+      background-color: #dc2626 !important;
+      color: #fca5a5 !important;
+      border-color: #b91c1c !important;
+      cursor: not-allowed !important;
+      opacity: 0.65;
+    }
+    .legend-box {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const initialMovies = [
+      {
+        id: "1",
+        title: "Inception",
+        description: "A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
+        genre: "Sci-Fi / Action",
+        duration: 148,
+        poster: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&auto=format&fit=crop&q=60"
+      },
+      {
+        id: "2",
+        title: "The Dark Knight",
+        description: "When the menace known as the Joker wreaks havoc and chaos on Gotham, Batman must accept one of the greatest psychological and physical tests.",
+        genre: "Action / Crime",
+        duration: 152,
+        poster: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&auto=format&fit=crop&q=60"
+      },
+      {
+        id: "3",
+        title: "Interstellar",
+        description: "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival on a distant hospitable world.",
+        genre: "Adventure / Sci-Fi",
+        duration: 169,
+        poster: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=60"
+      },
+      {
+        id: "4",
+        title: "Dune: Part Two",
+        description: "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.",
+        genre: "Action / Sci-Fi",
+        duration: 166,
+        poster: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=60"
+      }
+    ];
+
+    const generateSeats = () => {
+      const seats = [];
+      ['A', 'B', 'C', 'D', 'E'].forEach(row => {
+        for (let i = 1; i <= 8; i++) {
+          seats.push({
+            seatNumber: `${row}${i}`,
+            isBooked: (row === 'B' && i === 3) || (row === 'C' && i === 4)
+          });
+        }
+      });
+      return seats;
+    };
+
+    function App() {
+      const [view, setView] = useState('movies'); // 'movies' | 'detail' | 'seats' | 'confirmation' | 'my-bookings' | 'login'
+      const [user, setUser] = useState({ name: 'Demo User', email: 'demo@imovies.com' });
+      const [selectedMovie, setSelectedMovie] = useState(initialMovies[0]);
+      const [selectedShowtime, setSelectedShowtime] = useState(null);
+      const [seats, setSeats] = useState(generateSeats());
+      const [selectedSeats, setSelectedSeats] = useState([]);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [bookings, setBookings] = useState([
+        {
+          id: 'BK-9842',
+          movieTitle: 'Inception',
+          screen: 'IMAX Screen 1',
+          time: 'Today, 7:30 PM',
+          seats: ['C5', 'C6'],
+          total: 30,
+          status: 'confirmed',
+          createdAt: new Date().toLocaleDateString()
+        }
+      ]);
+      const [latestBooking, setLatestBooking] = useState(null);
+      const [alertMsg, setAlertMsg] = useState('');
+
+      // Real-time seat availability simulation: randomly books a seat every 12 seconds
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setSeats(prev => {
+            const available = prev.filter(s => !s.isBooked && !selectedSeats.includes(s.seatNumber));
+            if (available.length > 5 && Math.random() > 0.6) {
+              const randomIndex = Math.floor(Math.random() * available.length);
+              const targetSeat = available[randomIndex].seatNumber;
+              return prev.map(s => s.seatNumber === targetSeat ? { ...s, isBooked: true } : s);
+            }
+            return prev;
+          });
+        }, 12000);
+        return () => clearInterval(interval);
+      }, [selectedSeats]);
+
+      const handleSeatToggle = (seatNum) => {
+        if (selectedSeats.includes(seatNum)) {
+          setSelectedSeats(selectedSeats.filter(s => s !== seatNum));
+        } else {
+          setSelectedSeats([...selectedSeats, seatNum]);
+        }
+      };
+
+      const handleConfirmBooking = () => {
+        if (!user) {
+          setView('login');
+          return;
+        }
+        if (selectedSeats.length === 0) return;
+
+        // Mark seats as booked
+        setSeats(seats.map(s => selectedSeats.includes(s.seatNumber) ? { ...s, isBooked: true } : s));
+
+        const newBk = {
+          id: 'BK-' + Math.floor(1000 + Math.random() * 9000),
+          movieTitle: selectedMovie.title,
+          screen: selectedShowtime?.screen || 'IMAX Screen 1',
+          time: selectedShowtime?.time || 'Today, 7:30 PM',
+          seats: [...selectedSeats],
+          total: selectedSeats.length * 15,
+          status: 'confirmed',
+          createdAt: new Date().toLocaleDateString()
+        };
+
+        setBookings([newBk, ...bookings]);
+        setLatestBooking(newBk);
+        setSelectedSeats([]);
+        setView('confirmation');
+      };
+
+      const handleCancelBooking = (bookingId) => {
+        const bk = bookings.find(b => b.id === bookingId);
+        if (bk) {
+          // Free seats
+          setSeats(seats.map(s => bk.seats.includes(s.seatNumber) ? { ...s, isBooked: false } : s));
+          setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+          setAlertMsg(`Booking ${bookingId} cancelled. Seats ${bk.seats.join(', ')} freed!`);
+        }
+      };
+
+      const filteredMovies = initialMovies.filter(m =>
+        m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.genre.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      return (
+        <div className="d-flex flex-column min-vh-100">
+          {/* Navbar */}
+          <nav className="navbar navbar-expand-lg navbar-dark bg-black bg-opacity-75 sticky-top border-bottom border-secondary">
+            <div className="container">
+              <a className="navbar-brand fw-bold fs-3 text-warning d-flex align-items-center gap-2" href="#" onClick={() => setView('movies')}>
+                <i className="bi bi-film"></i> IMovies
+              </a>
+              <div className="d-flex align-items-center gap-3">
+                <button className={`btn btn-sm ${view === 'movies' ? 'btn-warning' : 'btn-outline-light'}`} onClick={() => setView('movies')}>
+                  Movies
+                </button>
+                <button className={`btn btn-sm ${view === 'my-bookings' ? 'btn-warning' : 'btn-outline-light'}`} onClick={() => setView('my-bookings')}>
+                  My Bookings ({bookings.filter(b => b.status === 'confirmed').length})
+                </button>
+                {user ? (
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-secondary p-2"><i className="bi bi-person-circle me-1"></i> {user.name}</span>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => setUser(null)}>Logout</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-sm btn-warning" onClick={() => setView('login')}>Sign In</button>
+                )}
+              </div>
+            </div>
+          </nav>
+
+          {alertMsg && (
+            <div className="alert alert-info alert-dismissible container mt-3" role="alert">
+              {alertMsg}
+              <button type="button" className="btn-close" onClick={() => setAlertMsg('')}></button>
+            </div>
+          )}
+
+          {/* MAIN CONTENT AREA */}
+          <div className="container py-4 flex-grow-1">
+            {/* VIEW 1: MOVIES LIST */}
+            {view === 'movies' && (
+              <div>
+                <div className="p-4 p-md-5 mb-4 rounded bg-primary bg-gradient text-white shadow-sm">
+                  <h1 className="display-5 fw-bold">Experience Cinema Like Never Before</h1>
+                  <p className="lead my-2">Book tickets, pick your favorite seats in real-time, and manage reservations.</p>
+                </div>
+
+                <div className="row align-items-center mb-4 g-3">
+                  <div className="col-12 col-md-6">
+                    <h3 className="fw-bold mb-0">Now Showing</h3>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <input
+                      type="text"
+                      className="form-control bg-dark text-white border-secondary"
+                      placeholder="Search movie title or genre..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="row g-4">
+                  {filteredMovies.map(movie => (
+                    <div key={movie.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                      <div className="card h-100 shadow-sm border-0">
+                        <img src={movie.poster} className="card-img-top movie-poster-card" alt={movie.title} />
+                        <div className="card-body d-flex flex-column">
+                          <h5 className="card-title fw-bold text-truncate">{movie.title}</h5>
+                          <div className="d-flex justify-content-between mb-2">
+                            <span className="badge bg-secondary">{movie.genre}</span>
+                            <span className="small text-light-50"><i className="bi bi-clock me-1"></i>{movie.duration}m</span>
+                          </div>
+                          <p className="small text-light-50 flex-grow-1">{movie.description.substring(0, 80)}...</p>
+                          <button
+                            className="btn btn-warning w-100 fw-semibold mt-auto"
+                            onClick={() => {
+                              setSelectedMovie(movie);
+                              setView('detail');
+                            }}
+                          >
+                            Showtimes & Seats &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 2: MOVIE DETAIL & SHOWTIMES */}
+            {view === 'detail' && selectedMovie && (
+              <div>
+                <button className="btn btn-outline-secondary btn-sm mb-4" onClick={() => setView('movies')}>
+                  &larr; Back to Movies
+                </button>
+                <div className="row g-4 mb-5">
+                  <div className="col-12 col-md-4">
+                    <img src={selectedMovie.poster} className="img-fluid rounded shadow-lg w-100" />
+                  </div>
+                  <div className="col-12 col-md-8">
+                    <h1 className="fw-bold">{selectedMovie.title}</h1>
+                    <div className="d-flex gap-2 my-3">
+                      <span className="badge bg-warning text-dark">{selectedMovie.genre}</span>
+                      <span className="badge bg-secondary">{selectedMovie.duration} mins</span>
+                    </div>
+                    <h5 className="text-warning mt-4">Synopsis</h5>
+                    <p className="lead fs-6 text-light-50">{selectedMovie.description}</p>
+                  </div>
+                </div>
+
+                <h3 className="fw-bold mb-4 border-top border-secondary pt-4">
+                  <i className="bi bi-calendar-event me-2 text-warning"></i>Available Showtimes
+                </h3>
+                <div className="row g-3">
+                  {[
+                    { screen: 'IMAX Screen 1', time: 'Today, 3:30 PM', price: 15 },
+                    { screen: 'Dolby Cinema 2', time: 'Today, 7:30 PM', price: 18 },
+                    { screen: 'Screen 3', time: 'Tomorrow, 6:00 PM', price: 12 }
+                  ].map((st, idx) => (
+                    <div key={idx} className="col-12 col-md-4">
+                      <div className="card p-3 border-secondary">
+                        <div className="d-flex justify-content-between">
+                          <span className="fw-bold text-warning">{st.time}</span>
+                          <span className="badge bg-dark border border-secondary">{st.screen}</span>
+                        </div>
+                        <div className="my-2 d-flex justify-content-between text-light-50 small">
+                          <span>Price: ${st.price}</span>
+                          <span className="text-success fw-bold">Live Seats Available</span>
+                        </div>
+                        <button
+                          className="btn btn-outline-warning w-100 mt-2"
+                          onClick={() => {
+                            setSelectedShowtime(st);
+                            setView('seats');
+                          }}
+                        >
+                          Select Seats &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 3: INTERACTIVE SEAT SELECTION */}
+            {view === 'seats' && selectedMovie && (
+              <div>
+                <button className="btn btn-outline-secondary btn-sm mb-4" onClick={() => setView('detail')}>
+                  &larr; Back to Showtimes
+                </button>
+
+                <div className="d-flex flex-wrap justify-content-between align-items-center pb-3 border-bottom border-secondary mb-4">
+                  <div>
+                    <h2 className="fw-bold mb-0">{selectedMovie.title}</h2>
+                    <span className="text-light-50 small">
+                      {selectedShowtime?.screen || 'IMAX Screen 1'} &bull; {selectedShowtime?.time || 'Today, 7:30 PM'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="badge bg-success p-2 me-2">Real-time Sync Active</span>
+                    <span className="badge bg-secondary p-2">Ticket: ${selectedShowtime?.price || 15}</span>
+                  </div>
+                </div>
+
+                <div className="row g-4">
+                  {/* Visual Screen & Seat Grid */}
+                  <div className="col-12 col-lg-8">
+                    <div className="card p-4 border-secondary text-center">
+                      <div className="screen-container text-center w-75 mx-auto mb-4">
+                        <div className="cinema-screen mb-2"></div>
+                        <small className="text-secondary text-uppercase tracking-wider">Screen</small>
+                      </div>
+
+                      {/* Seat layout */}
+                      <div className="d-flex flex-column align-items-center gap-2 mb-4">
+                        {['A', 'B', 'C', 'D', 'E'].map(row => (
+                          <div key={row} className="d-flex align-items-center gap-2">
+                            <span className="text-muted fw-bold me-2" style={{ width: '16px' }}>{row}</span>
+                            <div className="d-flex gap-2">
+                              {seats.filter(s => s.seatNumber.startsWith(row)).map(seat => {
+                                const isSelected = selectedSeats.includes(seat.seatNumber);
+                                let seatClass = 'seat-available';
+                                if (seat.isBooked) seatClass = 'seat-booked';
+                                else if (isSelected) seatClass = 'seat-selected';
+
+                                return (
+                                  <button
+                                    key={seat.seatNumber}
+                                    disabled={seat.isBooked}
+                                    className={`seat ${seatClass}`}
+                                    onClick={() => handleSeatToggle(seat.seatNumber)}
+                                    title={seat.isBooked ? 'Booked' : seat.seatNumber}
+                                  >
+                                    {seat.seatNumber}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Legend */}
+                      <div className="d-flex justify-content-center gap-4 p-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-25 w-75 mx-auto">
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="legend-box seat-available"></span>
+                          <span className="small text-light-50">Available</span>
+                        </div>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="legend-box seat-selected"></span>
+                          <span className="small text-light-50">Selected</span>
+                        </div>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="legend-box seat-booked"></span>
+                          <span className="small text-light-50">Booked</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary card */}
+                  <div className="col-12 col-lg-4">
+                    <div className="card p-4 border-secondary sticky-top" style={{ top: '80px' }}>
+                      <h4 className="fw-bold text-warning mb-3">Booking Summary</h4>
+                      <div className="mb-2 d-flex justify-content-between">
+                        <span className="text-light-50">Movie:</span>
+                        <span className="fw-semibold">{selectedMovie.title}</span>
+                      </div>
+                      <div className="mb-2 d-flex justify-content-between">
+                        <span className="text-light-50">Price/seat:</span>
+                        <span className="fw-semibold">${selectedShowtime?.price || 15}</span>
+                      </div>
+                      <div className="mb-3 d-flex justify-content-between">
+                        <span className="text-light-50">Selected Seats:</span>
+                        <span className="fw-bold text-success">
+                          {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None'}
+                        </span>
+                      </div>
+                      <hr className="border-secondary" />
+                      <div className="d-flex justify-content-between align-items-center mb-4">
+                        <span className="fs-5 fw-bold">Total:</span>
+                        <span className="fs-4 fw-bold text-warning">
+                          ${selectedSeats.length * (selectedShowtime?.price || 15)}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-warning btn-lg w-100 fw-bold"
+                        disabled={selectedSeats.length === 0}
+                        onClick={handleConfirmBooking}
+                      >
+                        {selectedSeats.length === 0 ? 'Select Seats' : `Confirm ${selectedSeats.length} Seat(s)`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 4: CONFIRMATION */}
+            {view === 'confirmation' && latestBooking && (
+              <div className="row justify-content-center py-4">
+                <div className="col-12 col-md-7 col-lg-6">
+                  <div className="card text-center border-success p-4 p-md-5 shadow-lg">
+                    <i className="bi bi-check-circle-fill text-success display-1 mb-3"></i>
+                    <h2 className="fw-bold text-white mb-2">Booking Confirmed!</h2>
+                    <p className="text-light-50 mb-4">Seats successfully reserved in real-time.</p>
+
+                    <div className="bg-dark p-4 rounded text-start border border-secondary mb-4">
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-light-50">Booking ID:</span>
+                        <span className="text-warning font-monospace">{latestBooking.id}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-light-50">Movie:</span>
+                        <span className="fw-bold">{latestBooking.movieTitle}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-light-50">Screen & Time:</span>
+                        <span>{latestBooking.screen} &bull; {latestBooking.time}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-light-50">Seats:</span>
+                        <span className="badge bg-warning text-dark fs-6">{latestBooking.seats.join(', ')}</span>
+                      </div>
+                      <hr className="border-secondary" />
+                      <div className="d-flex justify-content-between fw-bold">
+                        <span>Total Paid:</span>
+                        <span className="text-success fs-5">${latestBooking.total}</span>
+                      </div>
+                    </div>
+
+                    <div className="d-flex gap-3 justify-content-center">
+                      <button className="btn btn-warning px-4" onClick={() => setView('my-bookings')}>View My Bookings</button>
+                      <button className="btn btn-outline-light px-4" onClick={() => setView('movies')}>Browse More</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 5: MY BOOKINGS */}
+            {view === 'my-bookings' && (
+              <div>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h2 className="fw-bold mb-0"><i className="bi bi-ticket-perforated me-2 text-warning"></i>My Bookings</h2>
+                  <button className="btn btn-outline-light btn-sm" onClick={() => setView('movies')}>Browse Movies</button>
+                </div>
+
+                {bookings.length === 0 ? (
+                  <div className="card text-center py-5 border-secondary">
+                    <h4>No bookings found</h4>
+                  </div>
+                ) : (
+                  <div className="row g-4">
+                    {bookings.map(b => {
+                      const isCancelled = b.status === 'cancelled';
+                      return (
+                        <div key={b.id} className="col-12 col-md-6">
+                          <div className={`card p-4 border ${isCancelled ? 'border-danger opacity-75' : 'border-secondary'}`}>
+                            <div className="d-flex justify-content-between mb-2">
+                              <h4 className="fw-bold mb-0">{b.movieTitle}</h4>
+                              <span className={`badge ${isCancelled ? 'bg-danger' : 'bg-success'}`}>{b.status.toUpperCase()}</span>
+                            </div>
+                            <div className="text-light-50 small mb-3">{b.screen} &bull; {b.time}</div>
+
+                            <div className="bg-dark p-3 rounded mb-3 border border-secondary border-opacity-50">
+                              <div className="d-flex justify-content-between small mb-1">
+                                <span className="text-light-50">Seats:</span>
+                                <span className="fw-bold text-warning">{b.seats.join(', ')}</span>
+                              </div>
+                              <div className="d-flex justify-content-between small">
+                                <span className="text-light-50">Total Paid:</span>
+                                <span className="fw-bold">${b.total}</span>
+                              </div>
+                            </div>
+
+                            <div className="d-flex justify-content-end">
+                              {!isCancelled ? (
+                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleCancelBooking(b.id)}>
+                                  Cancel Booking (Free Seats)
+                                </button>
+                              ) : (
+                                <span className="text-danger small fw-semibold">Seats Released</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VIEW 6: LOGIN */}
+            {view === 'login' && (
+              <div className="row justify-content-center py-5">
+                <div className="col-12 col-md-5 col-lg-4">
+                  <div className="card p-4 border-secondary shadow-lg">
+                    <h3 className="fw-bold text-center mb-4 text-warning">Sign In</h3>
+                    <div className="mb-3">
+                      <label className="form-label small text-light-50">Email</label>
+                      <input type="email" className="form-control bg-dark text-white border-secondary" defaultValue="demo@imovies.com" />
+                    </div>
+                    <div className="mb-4">
+                      <label className="form-label small text-light-50">Password</label>
+                      <input type="password" className="form-control bg-dark text-white border-secondary" defaultValue="password123" />
+                    </div>
+                    <button
+                      className="btn btn-warning w-100 fw-bold py-2 mb-3"
+                      onClick={() => {
+                        setUser({ name: 'Demo Cinephile', email: 'demo@imovies.com' });
+                        setView('movies');
+                      }}
+                    >
+                      Login
+                    </button>
+                    <div className="text-muted small text-center">Demo credentials pre-filled.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <footer className="bg-black py-4 border-top border-secondary mt-auto">
+            <div className="container text-center text-muted small">
+              <p className="mb-0">&copy; 2026 IMovies Online Cinema Platform. Real-Time Seat Reservation.</p>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
